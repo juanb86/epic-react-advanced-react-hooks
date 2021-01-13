@@ -11,7 +11,7 @@ import {
 } from '../pokemon'
 
 // 🐨 this is going to be our generic asyncReducer
-function pokemonInfoReducer(state, action) {
+function asyncReducer(state, action) {
   switch (action.type) {
     case 'pending': {
       // 🐨 replace "pokemon" with "data"
@@ -31,56 +31,49 @@ function pokemonInfoReducer(state, action) {
   }
 }
 
-function useAsync(fetchFunction,status,dependencies) {
-const [state, dispatch] = React.useReducer(pokemonInfoReducer, {
-  status: data ? 'pending' : 'idle',
-  // 🐨 this will need to be "data" instead of "pokemon"
-  data: null,
-  error: null,
-})
+function useAsync(asyncCallback, initialState) {
+  const [state, dispatch] = React.useReducer(asyncReducer, {
+    status: 'idle',
+    // 🐨 this will need to be "data" instead of "pokemon"
+    data: null,
+    error: null,
+    ...initialState,
+  })
 
-React.useEffect(() => {
-  // 💰 this first early-exit bit is a little tricky, so let me give you a hint:
-  // const promise = asyncCallback()
-  // if (!promise) {
-  //   return
-  // }
-  // then you can dispatch and handle the promise etc...
-  if (!pokemonName) {
-    return
-  }
-  dispatch({type: 'pending'})
-  fetchPokemon(pokemonName).then(
-    pokemon => {
-      dispatch({type: 'resolved', pokemon})
-    },
-    error => {
-      dispatch({type: 'rejected', error})
-    },
-  )
-  // 🐨 you'll accept dependencies as an array and pass that here.
-  // 🐨 because of limitations with ESLint, you'll need to ignore
-  // the react-hooks/exhaustive-deps rule. We'll fix this in an extra credit.
-}, [pokemonName])
-return 
+  React.useEffect(() => {
+    const promise = asyncCallback()
+    if (!promise) {
+      return
+    }
+    dispatch({type: 'pending'})
+
+    promise.then(
+      data => {
+        dispatch({type: 'resolved', data})
+      },
+      error => {
+        dispatch({type: 'rejected', error})
+      },
+    )
+    // 🐨 you'll accept dependencies as an array and pass that here.
+    // 🐨 because of limitations with ESLint, you'll need to ignore
+    // the react-hooks/exhaustive-deps rule. We'll fix this in an extra credit.
+  },[asyncCallback])
+  return state
 }
 
 function PokemonInfo({pokemonName}) {
-  // 🐨 move both the useReducer and useEffect hooks to a custom hook called useAsync
-  // here's how you use it:
-  const state = useAsync(
-    () => {
-      if (!pokemonName) {
-        return
-      }
-      return fetchPokemon(pokemonName)
-    },
-    {status: pokemonName ? 'pending' : 'idle'},
-    [pokemonName],
-  )
-  // 🐨 so your job is to create a useAsync function that makes this work.
+  const asyncCallback = React.useCallback(() => {
+    if (!pokemonName) {
+      return
+    }
+    return fetchPokemon(pokemonName)
+  }, [pokemonName])
 
-  // 🐨 this will change from "pokemon" to "data"
+  const state = useAsync(asyncCallback, {
+    status: pokemonName ? 'pending' : 'idle',
+  })
+
   const {data, status, error} = state
 
   if (status === 'idle' || !pokemonName) {
@@ -90,7 +83,7 @@ function PokemonInfo({pokemonName}) {
   } else if (status === 'rejected') {
     throw error
   } else if (status === 'resolved') {
-    return <PokemonDataView pokemon={pokemon} />
+    return <PokemonDataView pokemon={data} />
   }
 
   throw new Error('This should be impossible')
