@@ -28,11 +28,24 @@ function asyncReducer(state, action) {
 }
 
 function useAsync(initialState) {
-  const [state, dispatch] = React.useReducer(asyncReducer, {
+  const [state, unsafeDispatch] = React.useReducer(asyncReducer, {
     status: 'idle',
     data: null,
     error: null,
     ...initialState,
+  })
+
+  const mounted = React.useRef(false)
+
+  React.useLayoutEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
+  const dispatch = React.useCallback((...args)=>{
+    if (mounted) return 
   })
 
   const run = React.useCallback(promise => {
@@ -40,10 +53,10 @@ function useAsync(initialState) {
 
     promise.then(
       data => {
-        dispatch({type: 'resolved', data})
+        mounted.current && dispatch({type: 'resolved', data})
       },
       error => {
-        dispatch({type: 'rejected', error})
+        mounted.current && dispatch({type: 'rejected', error})
       },
     )
   }, [])
@@ -101,14 +114,15 @@ function App() {
 
 function AppWithUnmountCheckbox() {
   const [mountApp, setMountApp] = React.useState(true)
+
+  const handleChange = e => {
+    setMountApp(e.target.checked)
+  }
+
   return (
     <div>
       <label>
-        <input
-          type="checkbox"
-          checked={mountApp}
-          onChange={e => setMountApp(e.target.checked)}
-        />{' '}
+        <input type="checkbox" checked={mountApp} onChange={handleChange} />{' '}
         Mount Component
       </label>
       <hr />
